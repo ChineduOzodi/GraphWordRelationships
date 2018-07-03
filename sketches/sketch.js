@@ -5,7 +5,27 @@ var wordRelationshipData = {};
 var wordObjectList = [];
 var lineObjectsList = [];
 var showName = true;
+var showCircle = true;
 var stopwords = ['all', 'just', 'being', 'over', 'both', 'through', 'yourselves', 'its', 'before', 'herself', 'had', 'should', 'to', 'only', 'under', 'ours', 'has', 'do', 'them', 'his', 'very', 'they', 'not', 'during', 'now', 'him', 'nor', 'did', 'this', 'she', 'each', 'further', 'where', 'few', 'because', 'doing', 'some', 'are', 'our', 'ourselves', 'out', 'what', 'for', 'while', 'does', 'above', 'between', 't', 'be', 'we', 'who', 'were', 'here', 'hers', 'by', 'on', 'about', 'of', 'against', 's', 'or', 'own', 'into', 'yourself', 'down', 'your', 'from', 'her', 'their', 'there', 'been', 'whom', 'too', 'themselves', 'was', 'until', 'more', 'himself', 'that', 'but', 'don', 'with', 'than', 'those', 'he', 'me', 'myself', 'these', 'up', 'will', 'below', 'can', 'theirs', 'my', 'and', 'then', 'is', 'am', 'it', 'an', 'as', 'itself', 'at', 'have', 'in', 'any', 'if', 'again', 'no', 'when', 'same', 'how', 'other', 'which', 'you', 'after', 'most', 'such', 'why', 'a', 'off', 'i', 'yours', 'so', 'the', 'having', 'once'];
+
+//text sizee
+var textMinObjSize = 0;
+var textMaxObjSize = 50;
+var textScale = 1;
+
+var minTextSlider;
+var maxTextSlider;
+var textScaleSlider;
+
+//Camera work
+var oldCenterOfMassX = 0;
+var oldCenterOfMassY = 0;
+var centerOfMassX = 0;
+var centerOfMassY = 0;
+var totalMass = 0;
+
+var changeCenterOfMassX = 0;
+var changeCenterOfMassY = 0;
 
 function setup() {
     canvas = createCanvas(1200, 800);
@@ -18,9 +38,47 @@ function setup() {
     calculateButton.mousePressed(createData);
     showNameButton = createButton("Names")
     showNameButton.mousePressed(showNames);
+    showCircleButton = createButton("Circles")
+    showCircleButton.mousePressed(toggleCircles);
+    textScaleSlider = createSlider(.5, 5, 1, .1);
+    textScaleSlider.input(textScaleChange);
+    button = createButton("Select All");
+    button.mousePressed(activateAll);
+    button = createButton("Deselect All");
+    button.mousePressed(deactivateAll);
+    minTextSlider = createSlider(0, 5, 0);
+    minTextSlider.input(minTextSliderChanged);
 
+    maxTextSlider = createSlider(2, 50, 50);
+    maxTextSlider.input(maxTextSliderChanged);
+}
+function activateAll() {
+    for (var i = 0; i < wordObjectList.length; i++) {
+        wordObjectList[i].active = true;
+    }
 }
 
+function deactivateAll() {
+    for (var i = 0; i < wordObjectList.length; i++) {
+        wordObjectList[i].active = false;
+    }
+}
+
+function maxTextSliderChanged() {
+    textMaxObjSize = this.value();
+    minTextSlider.attribute("max", this.value() - 1);
+}
+
+function minTextSliderChanged() {
+    textMinObjSize = this.value();
+}
+function textScaleChange() {
+    textScale = this.value();
+}
+
+function toggleCircles() {
+    showCircle = !showCircle;
+}
 function showNames() {
     showName = !showName;
 }
@@ -90,11 +148,15 @@ function createData() {
     }
 
     setWordGraph();
+
 }
 
 function setWordGraph() {
     //Reset data
     wordObjectList = [];
+    centerOfMassX = 0;
+    centerOfMassY = 0;
+    totalMass = 0;
 
     //Create objects in lise
     for (var i = 0; i < wordList.length; i++) {
@@ -106,15 +168,23 @@ function setWordGraph() {
             newWord.y = random(0, height);
             newWord.name = wordList[i];
 
+
+
             var filteredLines = lineObjectsList.filter(x => x.beginWord == newWord.name);
             // print(filteredLines);
             for (b = 0; b < filteredLines.length; b++) {
                 newWord.size += filteredLines[b].width * .1;
             }
 
+            //add to center of mass
+            centerOfMassX += newWord.x * newWord.size;
+            centerOfMassY += newWord.y * newWord.size;
+            totalMass += newWord.size;
         }
 
     }
+
+    calculateCenterOfMass();
 }
 
 function word() {
@@ -126,26 +196,50 @@ function word() {
     this.forceY = 0;
     this.size = 0;
     this.name = "";
+    this.alphaScale = 1;
+    this.active = true;
 
     this.display = function () {
-        stroke(50);
-        noStroke();
-        fill(0, 0, this.name.length / 20 * 255, 255);
-        ellipse(this.x, this.y, this.size, this.size);
+
+        if (this.active && this.size > textMinObjSize && this.size <= textMaxObjSize) {
+            this.alphaScale = 1;
+        }
+        else {
+            this.alphaScale = .1;
+        }
+
+        if (showCircle) {
+            stroke(50);
+            noStroke();
+            fill(0, 0, this.name.length / 20 * 255, 255 * this.alphaScale);
+            ellipse(this.x, this.y, this.size, this.size);
+        }
 
 
-        if (this.size / 2 + 5 > 10) {
+        if (textScale * this.size / 2 + 5 > 0) {
             strokeWeight(1);
-            stroke(255, 255, 255);
+            stroke(255, 255, 255, 255 * this.alphaScale);
         }
         else {
             noStroke();
         }
         fill(0, 0, 0);
-        if (showName) {
-            textSize(this.size / 1.2 + 5);
+        if (showName && this.active && this.size > textMinObjSize && this.size <= textMaxObjSize) {
+            textSize(textScale * this.size / 1.2 + 5);
             text(this.name, this.x, this.y); // Text wraps within text box
             textAlign(CENTER, CENTER);
+        }
+    }
+
+    this.clicked = function () {
+        if (dist(this.x, this.y, mouseX, mouseY) <= this.size) {
+            this.active = !this.active;
+            // for (var i = 0; i < lineObjectsList.length; i++) {
+            //     if (lineObjectsList[i].beginWord == this.name){
+            //         var endWord = wordObjectList.find((x) => x.name == lineObjectsList[i].endWord);
+            //         endWord.active = true;
+            //     }
+            // }
         }
     }
 
@@ -182,34 +276,39 @@ function word() {
                 }
                 var forceChangeX = .1 * (transX / biggesTrans) * this.size * obj.size * this.size * obj.size / (distance * distance);
                 var forceChangeY = .1 * (transY / biggesTrans) * this.size * obj.size * this.size * obj.size / (distance * distance);
-
-                this.forceX -= forceChangeX / this.size;
-                this.forceY -= forceChangeY / this.size;
+                if (distance < this.size + obj.size){
+                    forceChangeX *= 10;
+                    forceChangeY *= 10;
+                }
+                if (!isNaN(forceChangeX)){
+                    this.forceX += forceChangeX;
+                }
+                if(!isNaN(forceChangeY)){
+                    this.forceY += forceChangeY;
+                }
             }
         }
 
-
+        forceLimit = 50;
         //Set accel Limit
-        if (this.forceX > 20) {
-            this.forceX = 20;
+        if (this.forceX > forceLimit) {
+            this.forceX = forceLimit;
         }
-        if (this.forceX < -20) {
-            this.forceX = -20;
+        if (this.forceX < -forceLimit) {
+            this.forceX = -forceLimit;
         }
-        if (this.forceY > 20) {
-            this.forceY = 20;
+        if (this.forceY > forceLimit) {
+            this.forceY = forceLimit;
         }
-        if (this.forceY < -20) {
-            this.forceY = -20;
+        if (this.forceY < -forceLimit) {
+            this.forceY = -forceLimit;
         }
 
         // print('new force: ' + this.forceX + ' ' + this.forceY);
 
         //apply force to velocity; assume 60 frames per second
-        this.velX += this.forceX / frameRate();
-        this.velY += this.forceY / frameRate();
-
-
+        this.velX += this.forceX / frameRate() / this.size - changeCenterOfMassX * frameRate();
+        this.velY += this.forceY / frameRate() / this.size - changeCenterOfMassY * frameRate();
 
         //apply movement; assume 60 frames per second
         // print('vel: ' + this.velX + ' ' + this.velY);
@@ -217,6 +316,25 @@ function word() {
         this.x += this.velX / frameRate();
         this.y += this.velY / frameRate();
 
+        //Set boundaries
+
+        if (this.x > width - 20) {
+            this.x = width - 20;
+        }
+        if (this.x < 20) {
+            this.x = 20;
+        }
+        if (this.y > height - 20) {
+            this.y = height - 20;
+        }
+        if (this.y < 20) {
+            this.y = 20;
+        }
+
+        //add to center of mass
+        centerOfMassX += this.x * this.size;
+        centerOfMassY += this.y * this.size;
+        totalMass += this.size;
         //reset force
         this.forceX = 0;
         this.forceY = 0;
@@ -231,6 +349,7 @@ function wordLine() {
     this.length = 0;
     this.width = 20;
     this.currentLength = 0;
+    this.alphaScale = 1;
 
     this.pushPull = function () {
         //pull/push end word object towards desired length
@@ -254,14 +373,53 @@ function wordLine() {
     this.display = function () {
         var beginWord = wordObjectList.find((x) => x.name == this.beginWord);
         var endWord = wordObjectList.find((x) => x.name == this.endWord);
-        stroke(abs(this.currentLength - this.length), beginWord.name.length / 20 * 255 - abs(this.currentLength - this.length), 0, this.width * 2);
-        strokeWeight(this.width / 10);
+
+        if (beginWord.active && beginWord.size > textMinObjSize && beginWord.size <= textMaxObjSize) {
+            this.alphaScale = 1;
+        }
+        else {
+            this.alphaScale = .1;
+        }
+
         // print(beginWord);
         if (beginWord && endWord) {
+            stroke(abs(this.currentLength - this.length), beginWord.name.length / 20 * 255 - abs(this.currentLength - this.length), 0, this.alphaScale * 255 * .5);
+            strokeWeight(this.width / 10);
             line(beginWord.x, beginWord.y, endWord.x, endWord.y);
         }
 
     }
+}
+
+function mousePressed() {
+    for (var i = 0; i < wordObjectList.length; i++) {
+        wordObjectList[i].clicked();
+    }
+}
+
+function calculateCenterOfMass(){
+    oldCenterOfMassX = centerOfMassX / (totalMass * lineObjectsList.length);
+    oldCenterOfMassY = centerOfMassY / (totalMass * lineObjectsList.length);
+
+    //Reset
+    centerOfMassX = 0;
+    centerOfMassY = 0;
+    totalMass = 0;
+}
+
+function calculateCenterOfMassChange(){
+    newCenterOfMassX = centerOfMassX / (totalMass * lineObjectsList.length);
+    newCenterOfMassY = centerOfMassY / (totalMass * lineObjectsList.length);
+    changeCenterOfMassX = newCenterOfMassX - oldCenterOfMassX;
+    changeCenterOfMassY = newCenterOfMassY - oldCenterOfMassY;
+
+    oldCenterOfMassX = newCenterOfMassX;
+    oldCenterOfMassY = newCenterOfMassY;
+
+    //Reset
+    centerOfMassX = 0;
+    centerOfMassY = 0;
+    totalMass = 0;
 }
 
 function draw() {
@@ -284,5 +442,9 @@ function draw() {
     for (var i = 0; i < wordObjectList.length; i++) {
         wordObjectList[i].move();
     }
+    if (wordObjectList.length > 0){
+        calculateCenterOfMassChange();
+    }
 }
+
 
