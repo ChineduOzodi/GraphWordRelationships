@@ -8,9 +8,10 @@ var showName = true;
 var showCircle = true;
 var stopwords = ['all', 'just', 'being', 'over', 'both', 'through', 'yourselves', 'its', 'before', 'herself', 'had', 'should', 'to', 'only', 'under', 'ours', 'has', 'do', 'them', 'his', 'very', 'they', 'not', 'during', 'now', 'him', 'nor', 'did', 'this', 'she', 'each', 'further', 'where', 'few', 'because', 'doing', 'some', 'are', 'our', 'ourselves', 'out', 'what', 'for', 'while', 'does', 'above', 'between', 't', 'be', 'we', 'who', 'were', 'here', 'hers', 'by', 'on', 'about', 'of', 'against', 's', 'or', 'own', 'into', 'yourself', 'down', 'your', 'from', 'her', 'their', 'there', 'been', 'whom', 'too', 'themselves', 'was', 'until', 'more', 'himself', 'that', 'but', 'don', 'with', 'than', 'those', 'he', 'me', 'myself', 'these', 'up', 'will', 'below', 'can', 'theirs', 'my', 'and', 'then', 'is', 'am', 'it', 'an', 'as', 'itself', 'at', 'have', 'in', 'any', 'if', 'again', 'no', 'when', 'same', 'how', 'other', 'which', 'you', 'after', 'most', 'such', 'why', 'a', 'off', 'i', 'yours', 'so', 'the', 'having', 'once'];
 
+var maxObjSize = 20;
 //text sizee
 var textMinObjSize = 0;
-var textMaxObjSize = 50;
+var textMaxObjSize = 20;
 var textScale = 1;
 
 var minTextSlider;
@@ -46,7 +47,7 @@ function setup() {
     button.mousePressed(activateAll);
     button = createButton("Deselect All");
     button.mousePressed(deactivateAll);
-    minTextSlider = createSlider(0, 5, 0);
+    minTextSlider = createSlider(0, textMaxObjSize - 1, 0);
     minTextSlider.input(minTextSliderChanged);
 
     maxTextSlider = createSlider(2, 50, 50);
@@ -176,6 +177,16 @@ function setWordGraph() {
                 newWord.size += filteredLines[b].width * .1;
             }
 
+            //set maxTextSlider
+            if (newWord.size > textMaxObjSize){
+                textMaxObjSize = newWord.size;
+                maxTextSlider.attribute("max", textMaxObjSize);
+                minTextSlider.attribute("max", textMaxObjSize- 1);
+                maxObjSize = newWord.size;
+
+                maxTextSlider.value(textMaxObjSize);
+            }
+
             //add to center of mass
             centerOfMassX += newWord.x * newWord.size;
             centerOfMassY += newWord.y * newWord.size;
@@ -199,6 +210,10 @@ function word() {
     this.alphaScale = 1;
     this.active = true;
 
+    this.colorR = random(0,200);
+    this.colorG = random(0,200);
+    this.colorB = random(50,255);
+
     this.display = function () {
 
         if (this.active && this.size > textMinObjSize && this.size <= textMaxObjSize) {
@@ -211,7 +226,7 @@ function word() {
         if (showCircle) {
             stroke(50);
             noStroke();
-            fill(0, 0, this.name.length / 20 * 255, 255 * this.alphaScale);
+            fill(this.colorR, this.colorG, this.colorB, 255 * this.alphaScale);
             ellipse(this.x, this.y, this.size, this.size);
         }
 
@@ -368,6 +383,46 @@ function wordLine() {
         //  print(beginWord.name + ' l: ' + this.currentLength+ ' pulling ' + endWord.name);
         endWord.forceX += transX / biggesTrans * speed * beginWord.size * (this.currentLength - this.length);
         endWord.forceY += transY / biggesTrans * speed * beginWord.size * (this.currentLength - this.length);
+
+        //Make colors more similar
+        if ( abs(beginWord.colorR - endWord.colorR) > (beginWord.size + endWord.size) * .5){
+            endWord.colorR += (beginWord.colorR - endWord.colorR) * .01;
+        }
+        else{
+            endWord.colorR -= (beginWord.colorR - endWord.colorR) * .01;
+        }
+        if ( abs(beginWord.colorG - endWord.colorG) > (beginWord.size + endWord.size) * .5){
+            endWord.colorG += (beginWord.colorG - endWord.colorG) * .01;
+        }
+        else{
+            endWord.colorG -= (beginWord.colorG - endWord.colorG) * .01;
+        }
+        if ( abs(beginWord.colorB - endWord.colorB) > (beginWord.size + endWord.size) * .5){
+            endWord.colorB += (beginWord.colorB - endWord.colorB) * .01;
+        }
+        else{
+            endWord.colorB -= (beginWord.colorB - endWord.colorB) * .01;
+        }
+
+        //Add limits to the color
+        if(endWord.colorR > 255){
+            endWord.colorR = 255;
+        }
+        if(endWord.colorG > 255){
+            endWord.colorG = 255;
+        }
+        if(endWord.colorB > 255){
+            endWord.colorB = 255;
+        }
+        if(endWord.colorR < 0){
+            endWord.colorR = 0;
+        }
+        if(endWord.colorG < 0){
+            endWord.colorG = 0;
+        }
+        if(endWord.colorB < 0){
+            endWord.colorB = 0;
+        }
     }
 
     this.display = function () {
@@ -383,7 +438,7 @@ function wordLine() {
 
         // print(beginWord);
         if (beginWord && endWord) {
-            stroke(abs(this.currentLength - this.length), beginWord.name.length / 20 * 255 - abs(this.currentLength - this.length), 0, this.alphaScale * 255 * .5);
+            stroke((beginWord.colorR + endWord.colorR) / 2 ,(beginWord.colorG + endWord.colorG) / 2 ,(beginWord.colorB + endWord.colorB) / 2 , this.alphaScale * 255 * .5);
             strokeWeight(this.width / 10);
             line(beginWord.x, beginWord.y, endWord.x, endWord.y);
         }
@@ -412,9 +467,6 @@ function calculateCenterOfMassChange(){
     newCenterOfMassY = centerOfMassY / (totalMass * lineObjectsList.length);
     changeCenterOfMassX = newCenterOfMassX - oldCenterOfMassX;
     changeCenterOfMassY = newCenterOfMassY - oldCenterOfMassY;
-
-    oldCenterOfMassX = newCenterOfMassX;
-    oldCenterOfMassY = newCenterOfMassY;
 
     //Reset
     centerOfMassX = 0;
